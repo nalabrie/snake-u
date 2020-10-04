@@ -17,8 +17,6 @@
 #define BLACK 0x00000000
 #define RED 0xff000000
 
-#define FRAME_TIME 1000
-
 /* GLOBALS */
 
 // enum of possible player movement directions
@@ -39,6 +37,10 @@ unsigned int highScore = 0;
 // global variables for the screen buffers (tv and gamepad)
 void *tvBuffer;
 void *drcBuffer;
+
+// frame-time constants
+static const double FRAME_TIME = 1000.0 / 1.0;  // frame-time in milliseconds
+static const unsigned int FRAME_TIME_NS = FRAME_TIME * 1000000;  // frame-time in nanoseconds
 
 /* FUNCTION PROTOTYPES */
 
@@ -112,11 +114,11 @@ int main(int argc, char **argv) {
         thisTime = OSGetSystemTick();
         timeCounter += (double) (thisTime - lastTime);
         lastTime = thisTime;
-        if (timeCounter > OSMillisecondsToTicks(FRAME_TIME)) {
+        if (timeCounter > OSNanosecondsToTicks(FRAME_TIME_NS)) {
             /* everything inside this 'if' runs every 'FRAME_TIME' milliseconds */
 
             // reset the time counter for the next loop
-            timeCounter -= OSMillisecondsToTicks(FRAME_TIME);
+            timeCounter -= OSNanosecondsToTicks(FRAME_TIME_NS);
 
             // clear tv buffer, fill with black
             OSScreenClearBufferEx(SCREEN_TV, BLACK);
