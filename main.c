@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <malloc.h>
+#include <stdlib.h>
 
 #include <vpad/input.h>
 #include <coreinit/screen.h>
@@ -12,8 +13,11 @@
 #include <whb/proc.h>
 
 #define WHITE 0xffffff00
+#define GRAY 0x80808000
 #define BLACK 0x00000000
 #define RED 0xff000000
+
+#define FRAME_TIME 1000
 
 /* GLOBALS */
 
@@ -29,6 +33,12 @@ bool vpad_fatal = false;
 
 // player global variables
 direction snakeDirection = none;
+unsigned int score = 0;
+unsigned int highScore = 0;
+
+// global variables for the screen buffers (tv and gamepad)
+void *tvBuffer;
+void *drcBuffer;
 
 /* FUNCTION PROTOTYPES */
 
@@ -40,6 +50,9 @@ static void renderToScreen(OSScreenID screenID, void *screenBuffer, size_t scree
 
 // draws the world border around the screen 'screenID'
 static void drawBorder(OSScreenID screenID);
+
+// de-initializes everything necessary for a clean shutdown of the game
+static void shutdown();
 
 /* MAIN */
 
@@ -62,25 +75,15 @@ int main(int argc, char **argv) {
                  tvBufferSize, drcBufferSize);
 
     // allocate memory area for screen buffers (MUST be 0x100 aligned)
-    void *tvBuffer = memalign(0x100, tvBufferSize);
-    void *drcBuffer = memalign(0x100, drcBufferSize);
+    tvBuffer = memalign(0x100, tvBufferSize);
+    drcBuffer = memalign(0x100, drcBufferSize);
 
     // check that allocation actually succeeded
     if (!tvBuffer || !drcBuffer) {
         WHBLogPrint("Out of memory (screen buffer allocation failed)");
 
-        // free screen buffer memory
-        if (tvBuffer) free(tvBuffer);
-        if (drcBuffer) free(drcBuffer);
-
-        // deinit everything
-        WHBLogPrint("Quitting.");
-        OSScreenShutdown();
-        WHBProcShutdown();
-        WHBLogCafeDeinit();
-        WHBLogUdpDeinit();
-
-        // return error code
+        // close game and return error code
+        shutdown();
         return 1;
     }
 
@@ -92,33 +95,69 @@ int main(int argc, char **argv) {
     OSScreenEnableEx(SCREEN_TV, true);
 //    OSScreenEnableEx(SCREEN_DRC, true);
 
+    // setup timer related variables
+    int frameCounter = 1;  // increments each frame
+    double timeCounter = 0;  // how much time has passed between 'thisTime' and 'lastTime'
+    OSTick thisTime = OSGetSystemTick(); // current system time
+    OSTick lastTime = thisTime;  // system time from the last time 'thisTime' was updated
+
+    char debugBuffer[1024];  // debug buffer for printing messages
+
     // setup complete, enter main game loop
     while (WHBProcIsRunning()) {
         // get player input
         handleGamepadInput();
 
-        // clear tv buffer, fill with black
-        OSScreenClearBufferEx(SCREEN_TV, BLACK);
+        // do timer related calculations
+        thisTime = OSGetSystemTick();
+        timeCounter += (double) (thisTime - lastTime);
+        lastTime = thisTime;
+        if (timeCounter > OSMillisecondsToTicks(FRAME_TIME)) {
+            /* everything inside this 'if' runs every 'FRAME_TIME' milliseconds */
 
-        // draw the border around the screen edges
-        drawBorder(SCREEN_TV);
+            // reset the time counter for the next loop
+            timeCounter -= OSMillisecondsToTicks(FRAME_TIME);
 
-        // work completed, render to tv screen
-        renderToScreen(SCREEN_TV, tvBuffer, tvBufferSize);
+            // clear tv buffer, fill with black
+            OSScreenClearBufferEx(SCREEN_TV, BLACK);
+
+            // draw the border around the screen edges
+            drawBorder(SCREEN_TV);
+
+            // snake movement debug messages
+            switch (snakeDirection) {
+                case up:
+                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving up");
+                    break;
+                case right:
+                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving right");
+                    break;
+                case down:
+                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving down");
+                    break;
+                case left:
+                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving left");
+                    break;
+                case none:
+                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is not moving");
+                    break;
+                default:
+                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "unknown error");
+                    break;
+            }
+
+            // print debug buffer (frame counter)
+            itoa(frameCounter, debugBuffer, 10);
+            OSScreenPutFontEx(SCREEN_TV, 0, 2, debugBuffer);
+            frameCounter++;
+
+            // work completed, render to tv screen
+            renderToScreen(SCREEN_TV, tvBuffer, tvBufferSize);
+        }
     }
 
     // if we get here, ProcUI said we should quit
-    WHBLogPrint("Quitting.");
-
-    // free the screen buffers
-    if (tvBuffer) free(tvBuffer);
-    if (drcBuffer) free(drcBuffer);
-
-    // deinit everything
-    OSScreenShutdown();
-    WHBProcShutdown();
-    WHBLogCafeDeinit();
-    WHBLogUdpDeinit();
+    shutdown();
 
     return 0;
 }
@@ -136,25 +175,22 @@ static void handleGamepadInput() {
             break;
         }
         case VPAD_READ_NO_SAMPLES: {
-            // no data read on this frame
-            break;
+            // no data read on this frame, return now
+            return;
         }
         case VPAD_READ_INVALID_CONTROLLER: {
             // gamepad disconnected or 'invalid' in some other way
             WHBLogPrint("Gamepad disconnected!");
             vpad_fatal = true;
-            break;
+            return;  // fatal error, stop here
         }
         default: {
             // undocumented error, this should never happen
             WHBLogPrintf("Unknown VPAD error! %08X", error);
             vpad_fatal = true;
-            break;
+            return;  // fatal error, stop here
         }
     }
-
-    // if there was a fatal error, stop here
-    if (vpad_fatal) return;
 
     // read d-pad button presses and assign the corresponding player snake movement
     if (status.trigger & VPAD_BUTTON_UP) snakeDirection = up;
@@ -174,17 +210,17 @@ static void renderToScreen(OSScreenID screenID, void *screenBuffer, size_t scree
 static void drawBorder(OSScreenID screenID) {
     switch (screenID) {
         case SCREEN_TV:
-            // draw white 20px border on tv edges
+            // draw gray 20px border on tv edges
             for (int x = 0; x < 1280; ++x) {
                 for (int y = 0; y < 20; ++y) {
-                    OSScreenPutPixelEx(screenID, x, y, WHITE);  // top
-                    OSScreenPutPixelEx(screenID, x, 700 + y, WHITE);  // bottom
+                    OSScreenPutPixelEx(screenID, x, y, GRAY);  // top
+                    OSScreenPutPixelEx(screenID, x, 700 + y, GRAY);  // bottom
                 }
             }
             for (int x = 0; x < 20; ++x) {
                 for (int y = 0; y < 720; ++y) {
-                    OSScreenPutPixelEx(screenID, x, y, WHITE);  // left
-                    OSScreenPutPixelEx(screenID, 1260 + x, y, WHITE);  // right
+                    OSScreenPutPixelEx(screenID, x, y, GRAY);  // left
+                    OSScreenPutPixelEx(screenID, 1260 + x, y, GRAY);  // right
                 }
             }
             break;
@@ -195,4 +231,17 @@ static void drawBorder(OSScreenID screenID) {
             // should never occur, there are always two screens
             break;
     }
+}
+
+static void shutdown() {
+    // free screen buffer memory
+    if (tvBuffer) free(tvBuffer);
+    if (drcBuffer) free(drcBuffer);
+
+    // de-init everything
+    WHBLogPrint("Quitting.");
+    OSScreenShutdown();
+    WHBProcShutdown();
+    WHBLogCafeDeinit();
+    WHBLogUdpDeinit();
 }
