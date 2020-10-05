@@ -17,6 +17,8 @@
 #define BLACK 0x00000000
 #define RED 0xff000000
 
+#define BLOCK_SIZE 20
+
 /* GLOBALS */
 
 // enum of possible player movement directions
@@ -29,22 +31,28 @@ VPADStatus status;
 VPADReadError error;
 bool vpad_fatal = false;
 
-// player global variables
-direction snakeDirection = none;
+// scoring global variables
 unsigned int score = 0;
 unsigned int highScore = 0;
+
+// snake (player) struct
+static struct snake {
+    unsigned int x, y;
+    direction direction;
+} snake = {630, 350, none};
 
 // global variables for the screen buffers (tv and gamepad)
 void *tvBuffer;
 void *drcBuffer;
 
 // frame-time constants
-static const double FRAME_TIME = 1000.0 / 1.0;  // frame-time in milliseconds
+static const double FPS = 4.0;  // desired frames per second (only adjust this value)
+static const double FRAME_TIME = 1000.0 / FPS;  // frame-time in milliseconds
 static const unsigned int FRAME_TIME_NS = FRAME_TIME * 1000000;  // frame-time in nanoseconds
 
 /* FUNCTION PROTOTYPES */
 
-// process user's button inputs each frame
+// process user's button inputs
 static void handleGamepadInput();
 
 // render to screen 'screenID'
@@ -52,6 +60,9 @@ static void renderToScreen(OSScreenID screenID, void *screenBuffer, size_t scree
 
 // draws the world border around the screen 'screenID'
 static void drawBorder(OSScreenID screenID);
+
+// draws a 'color' colored square of size 'BLOCK_SIZE' on screen 'screenID' (note: (x,y) starts at top-left corner)
+static void drawSquare(OSScreenID screenID, uint32_t x_start, uint32_t y_start, uint32_t color);
 
 // de-initializes everything necessary for a clean shutdown of the game
 static void shutdown();
@@ -127,7 +138,7 @@ int main(int argc, char **argv) {
             drawBorder(SCREEN_TV);
 
             // snake movement debug messages
-            switch (snakeDirection) {
+            switch (snake.direction) {
                 case up:
                     OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving up");
                     break;
@@ -195,10 +206,10 @@ static void handleGamepadInput() {
     }
 
     // read d-pad button presses and assign the corresponding player snake movement
-    if (status.trigger & VPAD_BUTTON_UP) snakeDirection = up;
-    else if (status.trigger & VPAD_BUTTON_RIGHT) snakeDirection = right;
-    else if (status.trigger & VPAD_BUTTON_DOWN) snakeDirection = down;
-    else if (status.trigger & VPAD_BUTTON_LEFT) snakeDirection = left;
+    if (status.trigger & VPAD_BUTTON_UP) snake.direction = up;
+    else if (status.trigger & VPAD_BUTTON_RIGHT) snake.direction = right;
+    else if (status.trigger & VPAD_BUTTON_DOWN) snake.direction = down;
+    else if (status.trigger & VPAD_BUTTON_LEFT) snake.direction = left;
 }
 
 static void renderToScreen(OSScreenID screenID, void *screenBuffer, size_t screenBufferSize) {
@@ -212,14 +223,14 @@ static void renderToScreen(OSScreenID screenID, void *screenBuffer, size_t scree
 static void drawBorder(OSScreenID screenID) {
     switch (screenID) {
         case SCREEN_TV:
-            // draw gray 20px border on tv edges
+            // draw gray border on tv edges of size 'BLOCK_SIZE'
             for (int x = 0; x < 1280; ++x) {
-                for (int y = 0; y < 20; ++y) {
+                for (int y = 0; y < BLOCK_SIZE; ++y) {
                     OSScreenPutPixelEx(screenID, x, y, GRAY);  // top
                     OSScreenPutPixelEx(screenID, x, 700 + y, GRAY);  // bottom
                 }
             }
-            for (int x = 0; x < 20; ++x) {
+            for (int x = 0; x < BLOCK_SIZE; ++x) {
                 for (int y = 0; y < 720; ++y) {
                     OSScreenPutPixelEx(screenID, x, y, GRAY);  // left
                     OSScreenPutPixelEx(screenID, 1260 + x, y, GRAY);  // right
@@ -232,6 +243,14 @@ static void drawBorder(OSScreenID screenID) {
         default:
             // should never occur, there are always two screens
             break;
+    }
+}
+
+static void drawSquare(OSScreenID screenID, uint32_t x_start, uint32_t y_start, uint32_t color) {
+    for (int x = 0; x < BLOCK_SIZE; ++x) {
+        for (int y = 0; y < BLOCK_SIZE; ++y) {
+            OSScreenPutPixelEx(screenID, x_start + x, y_start + y, color);
+        }
     }
 }
 
