@@ -16,6 +16,7 @@
 #define GRAY 0x80808000
 #define BLACK 0x00000000
 #define RED 0xff000000
+#define GREEN 0x00800000
 
 #define BLOCK_SIZE 20
 
@@ -37,16 +38,21 @@ unsigned int highScore = 0;
 
 // snake (player) struct
 static struct snake {
-    unsigned int x, y;
+    unsigned int x, y, length;
     direction direction;
-} snake = {630, 350, none};
+} snake = {300, 340, 4, none};
+
+// apple struct
+static struct apple {
+    unsigned int x, y;
+} apple = {980, 340};
 
 // global variables for the screen buffers (tv and gamepad)
 void *tvBuffer;
 void *drcBuffer;
 
 // frame-time constants
-static const double FPS = 4.0;  // desired frames per second (only adjust this value)
+static const double FPS = 5.0;  // desired frames per second (only adjust this value)
 static const double FRAME_TIME = 1000.0 / FPS;  // frame-time in milliseconds
 static const unsigned int FRAME_TIME_NS = FRAME_TIME * 1000000;  // frame-time in nanoseconds
 
@@ -63,6 +69,12 @@ static void drawBorder(OSScreenID screenID);
 
 // draws a 'color' colored square of size 'BLOCK_SIZE' on screen 'screenID' (note: (x,y) starts at top-left corner)
 static void drawSquare(OSScreenID screenID, uint32_t x_start, uint32_t y_start, uint32_t color);
+
+// draw the snake to the screen 'screenID'
+static void drawSnake(OSScreenID screenID);
+
+// moves the snake in direction requested by the gamepad
+static void moveSnake();
 
 // de-initializes everything necessary for a clean shutdown of the game
 static void shutdown();
@@ -136,6 +148,10 @@ int main(int argc, char **argv) {
 
             // draw the border around the screen edges
             drawBorder(SCREEN_TV);
+
+            moveSnake();
+            drawSnake(SCREEN_TV);
+            drawSquare(SCREEN_TV, apple.x, apple.y, RED);  // fake apple
 
             showDebug();
 
@@ -226,6 +242,33 @@ static void drawSquare(OSScreenID screenID, uint32_t x_start, uint32_t y_start, 
         for (int y = 0; y < BLOCK_SIZE; ++y) {
             OSScreenPutPixelEx(screenID, x_start + x, y_start + y, color);
         }
+    }
+}
+
+static void drawSnake(OSScreenID screenID) {
+    // placeholder code for testing, does not move correctly
+    for (int i = 0; i < snake.length; ++i) {
+        drawSquare(screenID, snake.x - i * 20, snake.y, GREEN);
+    }
+}
+
+static void moveSnake() {
+    switch (snake.direction) {
+        case up:
+            snake.y -= BLOCK_SIZE;
+            break;
+        case right:
+            snake.x += BLOCK_SIZE;
+            break;
+        case down:
+            snake.y += BLOCK_SIZE;
+            break;
+        case left:
+            snake.x -= BLOCK_SIZE;
+            break;
+        case none:
+            // do not move
+            break;
     }
 }
 
