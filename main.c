@@ -67,6 +67,9 @@ static void drawSquare(OSScreenID screenID, uint32_t x_start, uint32_t y_start, 
 // de-initializes everything necessary for a clean shutdown of the game
 static void shutdown();
 
+// show debug messages when 'b' is true
+static void showDebug();
+
 /* MAIN */
 
 int main(int argc, char **argv) {
@@ -109,12 +112,9 @@ int main(int argc, char **argv) {
 //    OSScreenEnableEx(SCREEN_DRC, true);
 
     // setup timer related variables
-    int frameCounter = 1;  // increments each frame
     double timeCounter = 0;  // how much time has passed between 'thisTime' and 'lastTime'
     OSTick thisTime = OSGetSystemTick(); // current system time
     OSTick lastTime = thisTime;  // system time from the last time 'thisTime' was updated
-
-    char debugBuffer[1024];  // debug buffer for printing messages
 
     // setup complete, enter main game loop
     while (WHBProcIsRunning()) {
@@ -137,32 +137,7 @@ int main(int argc, char **argv) {
             // draw the border around the screen edges
             drawBorder(SCREEN_TV);
 
-            // snake movement debug messages
-            switch (snake.direction) {
-                case up:
-                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving up");
-                    break;
-                case right:
-                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving right");
-                    break;
-                case down:
-                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving down");
-                    break;
-                case left:
-                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving left");
-                    break;
-                case none:
-                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is not moving");
-                    break;
-                default:
-                    OSScreenPutFontEx(SCREEN_TV, 0, 1, "unknown error");
-                    break;
-            }
-
-            // print debug buffer (frame counter)
-            itoa(frameCounter, debugBuffer, 10);
-            OSScreenPutFontEx(SCREEN_TV, 0, 2, debugBuffer);
-            frameCounter++;
+            showDebug();
 
             // work completed, render to tv screen
             renderToScreen(SCREEN_TV, tvBuffer, tvBufferSize);
@@ -265,4 +240,35 @@ static void shutdown() {
     WHBProcShutdown();
     WHBLogCafeDeinit();
     WHBLogUdpDeinit();
+}
+
+static void showDebug() {
+    // snake movement debug messages
+    switch (snake.direction) {
+        case up:
+            OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving up");
+            break;
+        case right:
+            OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving right");
+            break;
+        case down:
+            OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving down");
+            break;
+        case left:
+            OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving left");
+            break;
+        case none:
+            OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is not moving");
+            break;
+        default:
+            OSScreenPutFontEx(SCREEN_TV, 0, 1, "unknown error");
+            break;
+    }
+
+    // display frame counter
+    static int frameCounter = 1;
+    char buffer[256];
+    itoa(frameCounter, buffer, 10);
+    OSScreenPutFontEx(SCREEN_TV, 0, 2, buffer);
+    frameCounter++;
 }
