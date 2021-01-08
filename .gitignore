@@ -1,2 +1,7 @@
-# Project exclude paths
-/cmake-build-debug/
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/snake-u/v16
+/snake-u/x64/Release
+/x64/Release
