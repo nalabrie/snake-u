@@ -268,6 +268,11 @@ static void drawSnake(OSScreenID screenID) {
 }
 
 static void moveSnake() {
+  // store old snake head position
+  unsigned int temp_x = snake.x;
+  unsigned int temp_y = snake.y;
+
+  // move snake head
   switch (snake.direction) {
     case up:
       snake.y -= BLOCK_SIZE;
@@ -283,8 +288,16 @@ static void moveSnake() {
       break;
     case none:
       // do not move
-      break;
+      return;
   }
+
+  // move snake body
+  for (unsigned int i = snake.length - 2; i > 0; i--) {
+    snake.body_x[i] = snake.body_x[i - 1];
+    snake.body_y[i] = snake.body_y[i - 1];
+  }
+  snake.body_x[0] = temp_x;
+  snake.body_y[0] = temp_y;
 }
 
 static void shutdown() {
