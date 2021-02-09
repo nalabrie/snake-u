@@ -40,6 +40,10 @@ unsigned int highScore = 0;
 static struct snake {
   unsigned int x, y, length;
   direction direction;
+
+  // parallel arrays to store the coordinates of the snake's body
+  unsigned int body_x[(1240 / BLOCK_SIZE) * (680 / BLOCK_SIZE)];
+  unsigned int body_y[(1240 / BLOCK_SIZE) * (680 / BLOCK_SIZE)];
 } snake = {300, 340, 4, none};
 
 // apple struct
@@ -78,7 +82,7 @@ static void moveSnake();
 // de-initializes everything necessary for a clean shutdown of the game
 static void shutdown();
 
-// show debug messages when 'b' is true
+// show debug messages
 static void showDebug();
 
 /* MAIN */
@@ -126,6 +130,12 @@ int main(int argc, char **argv) {
   OSTick thisTime = OSGetSystemTick();  // current system time
   OSTick lastTime = thisTime;           // system time from the last time 'thisTime' was updated
 
+  // setup starting snake body locations
+  for (unsigned int i = 0; i < snake.length - 1; i++) {
+    snake.body_x[i] = snake.x - (i + 1) * BLOCK_SIZE;
+    snake.body_y[i] = snake.y;
+  }
+
   // setup complete, enter main game loop
   while (WHBProcIsRunning()) {
     // get player input
@@ -136,7 +146,7 @@ int main(int argc, char **argv) {
     timeCounter += (double)(thisTime - lastTime);
     lastTime = thisTime;
     if (timeCounter > OSNanosecondsToTicks(FRAME_TIME_NS)) {
-      /* everything inside this 'if' runs every 'FRAME_TIME' milliseconds */
+      /* everything inside this 'if' runs every 'FRAME_TIME' milliseconds (every frame) */
 
       // reset the time counter for the next loop
       timeCounter -= OSNanosecondsToTicks(FRAME_TIME_NS);
@@ -216,14 +226,14 @@ static void renderToScreen(OSScreenID screenID, void *screenBuffer, size_t scree
 static void drawBorder(OSScreenID screenID) {
   switch (screenID) {
     case SCREEN_TV:
-      // draw gray border on tv edges of size 'BLOCK_SIZE'
+      // draw 20px wide gray border on tv edges
       for (int x = 0; x < 1280; ++x) {
-        for (int y = 0; y < BLOCK_SIZE; ++y) {
+        for (int y = 0; y < 20; ++y) {
           OSScreenPutPixelEx(screenID, x, y, GRAY);        // top
           OSScreenPutPixelEx(screenID, x, 700 + y, GRAY);  // bottom
         }
       }
-      for (int x = 0; x < BLOCK_SIZE; ++x) {
+      for (int x = 0; x < 20; ++x) {
         for (int y = 0; y < 720; ++y) {
           OSScreenPutPixelEx(screenID, x, y, GRAY);         // left
           OSScreenPutPixelEx(screenID, 1260 + x, y, GRAY);  // right
@@ -248,9 +258,12 @@ static void drawSquare(OSScreenID screenID, uint32_t x_start, uint32_t y_start, 
 }
 
 static void drawSnake(OSScreenID screenID) {
-  // placeholder code for testing, does not move correctly
-  for (unsigned int i = 0; i < snake.length; ++i) {
-    drawSquare(screenID, snake.x - i * 20, snake.y, GREEN);
+  // draw snake head
+  drawSquare(screenID, snake.x, snake.y, GREEN);
+
+  // draw snake body
+  for (unsigned int i = 0; i < snake.length - 1; i++) {
+    drawSquare(screenID, snake.body_x[i], snake.body_y[i], GREEN);
   }
 }
 
