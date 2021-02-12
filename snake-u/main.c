@@ -85,6 +85,10 @@ static void shutdown();
 // show debug messages
 static void showDebug();
 
+// checks if the snake has collided with either itself, the border, or the apple
+// returns 'true' when snake died (hit itself or border)
+static bool checkSnakeCollision();
+
 /* MAIN */
 
 int main(int argc, char **argv) {
@@ -136,6 +140,9 @@ int main(int argc, char **argv) {
     snake.body_y[i] = snake.y;
   }
 
+  // represents if the game is over or not
+  bool gameOver = false;
+
   // setup complete, enter main game loop
   while (WHBProcIsRunning()) {
     // get player input
@@ -157,15 +164,20 @@ int main(int argc, char **argv) {
       // draw the border around the screen edges
       drawBorder(SCREEN_TV);
 
+      // move snake, check for a collision, draw the snake and apple
       moveSnake();
+      gameOver = checkSnakeCollision();
       drawSnake(SCREEN_TV);
-      drawSquare(SCREEN_TV, apple.x, apple.y, RED);  // fake apple
+      drawSquare(SCREEN_TV, apple.x, apple.y, RED);  // apple
 
       showDebug();
 
       // work completed, render to tv screen
       renderToScreen(SCREEN_TV, tvBuffer, tvBufferSize);
     }
+
+    // end the game if the snake is dead
+    if (gameOver) break;  // placeholder, just kills game
   }
 
   // if we get here, ProcUI said we should quit
@@ -205,14 +217,13 @@ static void handleGamepadInput() {
   }
 
   // read d-pad button presses and assign the corresponding player snake movement
-  // snake cannot move the reverse of the direction it is already moving
-  if (status.trigger & VPAD_BUTTON_UP && snake.direction != down)
+  if (status.trigger & VPAD_BUTTON_UP)
     snake.direction = up;
-  else if (status.trigger & VPAD_BUTTON_RIGHT && snake.direction != left)
+  else if (status.trigger & VPAD_BUTTON_RIGHT)
     snake.direction = right;
-  else if (status.trigger & VPAD_BUTTON_DOWN && snake.direction != up)
+  else if (status.trigger & VPAD_BUTTON_DOWN)
     snake.direction = down;
-  else if (status.trigger & VPAD_BUTTON_LEFT && snake.direction != right)
+  else if (status.trigger & VPAD_BUTTON_LEFT)
     snake.direction = left;
 }
 
@@ -269,6 +280,30 @@ static void drawSnake(OSScreenID screenID) {
 }
 
 static void moveSnake() {
+  // snake cannot move the reverse of the direction it is already moving
+  static direction previousDirection = none;
+  switch (previousDirection) {
+    case up:
+      if (snake.direction == down) snake.direction = previousDirection;
+      break;
+    case right:
+      if (snake.direction == left) snake.direction = previousDirection;
+      break;
+    case down:
+      if (snake.direction == up) snake.direction = previousDirection;
+      break;
+    case left:
+      if (snake.direction == right) snake.direction = previousDirection;
+      break;
+    case none:
+      if (snake.direction == left) snake.direction = previousDirection;
+      break;
+    default:
+      // should never occur, log error
+      WHBLogPrint("unknown error while moving snake");
+      break;
+  }
+
   // store old snake head position
   unsigned int temp_x = snake.x;
   unsigned int temp_y = snake.y;
@@ -299,6 +334,9 @@ static void moveSnake() {
   }
   snake.body_x[0] = temp_x;
   snake.body_y[0] = temp_y;
+
+  // store current direction as previous direction for next function call
+  previousDirection = snake.direction;
 }
 
 static void shutdown() {
@@ -343,4 +381,18 @@ static void showDebug() {
   itoa(frameCounter, buffer, 10);
   OSScreenPutFontEx(SCREEN_TV, 0, 2, buffer);
   frameCounter++;
+}
+
+static bool checkSnakeCollision() {
+  // check for collision with itself
+  for (unsigned int i = 0; i < snake.length - 1; i++) {
+    if (snake.x == snake.body_x[i] && snake.y == snake.body_y[i]) return true;
+  }
+
+  // check for collision with the border
+  if (snake.x < 20 || snake.x >= 1260) return true;
+  if (snake.y < 20 || snake.y >= 700) return true;
+
+  // snake is still alive
+  return false;
 }
