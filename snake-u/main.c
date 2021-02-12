@@ -205,13 +205,14 @@ static void handleGamepadInput() {
   }
 
   // read d-pad button presses and assign the corresponding player snake movement
-  if (status.trigger & VPAD_BUTTON_UP)
+  // snake cannot move the reverse of the direction it is already moving
+  if (status.trigger & VPAD_BUTTON_UP && snake.direction != down)
     snake.direction = up;
-  else if (status.trigger & VPAD_BUTTON_RIGHT)
+  else if (status.trigger & VPAD_BUTTON_RIGHT && snake.direction != left)
     snake.direction = right;
-  else if (status.trigger & VPAD_BUTTON_DOWN)
+  else if (status.trigger & VPAD_BUTTON_DOWN && snake.direction != up)
     snake.direction = down;
-  else if (status.trigger & VPAD_BUTTON_LEFT)
+  else if (status.trigger & VPAD_BUTTON_LEFT && snake.direction != right)
     snake.direction = left;
 }
 
