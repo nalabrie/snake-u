@@ -344,8 +344,6 @@ static void moveSnake() {
   snake.body_x[0] = temp_x;
   snake.body_y[0] = temp_y;
 
-  // TODO: account for new body addition to fix spawning bug
-
   // store current direction as previous direction for next function call
   previousDirection = snake.direction;
 }
@@ -409,6 +407,8 @@ static bool checkSnakeCollision() {
     // increment score and snake length
     score++;
     snake.length++;
+    snake.body_x[snake.length - 2] = snake.body_x[snake.length - 3];  // spawning bug fix
+    snake.body_y[snake.length - 2] = snake.body_y[snake.length - 3];  // spawning bug fix
 
     // move apple to new random location
     apple.x = (rand() % (1240 / BLOCK_SIZE)) * BLOCK_SIZE + 20;
