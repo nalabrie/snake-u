@@ -2,6 +2,7 @@
 #include <malloc.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 // Wii U includes
@@ -34,7 +35,7 @@ bool vpad_fatal = false;
 
 // scoring global variables
 unsigned int score = 0;
-unsigned int highScore = 0;
+unsigned int highScore = 0;  // TODO
 
 // snake (player) struct
 static struct snake {
@@ -87,7 +88,11 @@ static void showDebug();
 
 // checks if the snake has collided with either itself, the border, or the apple
 // returns 'true' when snake died (hit itself or border)
+// moves apple when collided
 static bool checkSnakeCollision();
+
+// prints the current score to the screen
+static void showScore();
 
 /* MAIN */
 
@@ -143,6 +148,9 @@ int main(int argc, char **argv) {
   // represents if the game is over or not
   bool gameOver = false;
 
+  // seed random number generator with system time (I think? no documentation)
+  srand(OSGetTime());
+
   // setup complete, enter main game loop
   while (WHBProcIsRunning()) {
     // get player input
@@ -170,14 +178,15 @@ int main(int argc, char **argv) {
       drawSnake(SCREEN_TV);
       drawSquare(SCREEN_TV, apple.x, apple.y, RED);  // apple
 
-      showDebug();
+      showScore();
+      // showDebug();
 
       // work completed, render to tv screen
       renderToScreen(SCREEN_TV, tvBuffer, tvBufferSize);
     }
 
     // end the game if the snake is dead
-    if (gameOver) break;  // placeholder, just kills game
+    if (gameOver) break;  // TODO: placeholder, just kills game
   }
 
   // if we get here, ProcUI said we should quit
@@ -335,6 +344,8 @@ static void moveSnake() {
   snake.body_x[0] = temp_x;
   snake.body_y[0] = temp_y;
 
+  // TODO: account for new body addition to fix spawning bug
+
   // store current direction as previous direction for next function call
   previousDirection = snake.direction;
 }
@@ -356,22 +367,22 @@ static void showDebug() {
   // snake movement debug messages
   switch (snake.direction) {
     case up:
-      OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving up");
+      OSScreenPutFontEx(SCREEN_TV, 0, 2, "snake is moving up");
       break;
     case right:
-      OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving right");
+      OSScreenPutFontEx(SCREEN_TV, 0, 2, "snake is moving right");
       break;
     case down:
-      OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving down");
+      OSScreenPutFontEx(SCREEN_TV, 0, 2, "snake is moving down");
       break;
     case left:
-      OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is moving left");
+      OSScreenPutFontEx(SCREEN_TV, 0, 2, "snake is moving left");
       break;
     case none:
-      OSScreenPutFontEx(SCREEN_TV, 0, 1, "snake is not moving");
+      OSScreenPutFontEx(SCREEN_TV, 0, 2, "snake is not moving");
       break;
     default:
-      OSScreenPutFontEx(SCREEN_TV, 0, 1, "unknown error");
+      OSScreenPutFontEx(SCREEN_TV, 0, 2, "unknown error");
       break;
   }
 
@@ -379,7 +390,7 @@ static void showDebug() {
   static int frameCounter = 1;
   char buffer[256];
   itoa(frameCounter, buffer, 10);
-  OSScreenPutFontEx(SCREEN_TV, 0, 2, buffer);
+  OSScreenPutFontEx(SCREEN_TV, 0, 3, buffer);
   frameCounter++;
 }
 
@@ -393,6 +404,23 @@ static bool checkSnakeCollision() {
   if (snake.x < 20 || snake.x >= 1260) return true;
   if (snake.y < 20 || snake.y >= 700) return true;
 
+  // check for collision with apple
+  if (snake.x == apple.x && snake.y == apple.y) {
+    // increment score and snake length
+    score++;
+    snake.length++;
+
+    // move apple to new random location
+    apple.x = (rand() % (1240 / BLOCK_SIZE)) * BLOCK_SIZE + 20;
+    apple.y = (rand() % (680 / BLOCK_SIZE)) * BLOCK_SIZE + 20;
+  }
+
   // snake is still alive
   return false;
+}
+
+static void showScore() {
+  char buffer[16];
+  sprintf(buffer, "score: %u", score);
+  OSScreenPutFontEx(SCREEN_TV, 0, 1, buffer);
 }
